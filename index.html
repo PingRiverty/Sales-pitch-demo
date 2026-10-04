@@ -7887,6 +7887,13 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   function prepareClone(clone, target, shiftScroll){
     if (!clone || clone.nodeType !== 1 || clone.id !== target.id) return;
     clone.style.zoom = '1';
+    // The on-screen silver rim + drop shadow (box-shadow) paint outside the
+    // frame's own box. The capture canvas is sized to the frame's own box
+    // (offsetWidth/offsetHeight), so that overflow gets clipped unevenly —
+    // fully visible on one side, cut off on another. Strip it for the
+    // export clone so the edge is clean on every side; EXPORT_PAD_CSS_FRAMED
+    // supplies the breathing room instead.
+    if (clone.id === 'deviceFrame') clone.style.boxShadow = 'none';
     const vp = document.getElementById('viewport');
     const top = vp ? vp.scrollTop : 0;
     const cvp = clone.id === 'viewport' ? clone : clone.querySelector('#viewport');
@@ -7922,12 +7929,60 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     });
     return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('empty image')), 'image/png'));
   }
-  function download(blob, file){
+  // Adds transparent breathing room around the captured screenshot so it
+  // isn't cropped flush to the edge. padCss is specified in CSS px and is
+  // scaled up by SCALE to match the captured image's actual pixel density,
+  // so the visible margin looks the same size regardless of export scale.
+  const EXPORT_PAD_CSS = 4;
+  // The phone frame (bezel + rounded corners) reads as tighter against its
+  // own edge than the bare screen does at the same margin, so it gets a
+  // couple of extra CSS px of breathing room.
+  const EXPORT_PAD_CSS_FRAMED = 6;
+  async function addPadding(blob, padCss){
+    const pad = Math.round(padCss * SCALE);
+    if (!pad) return blob;
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width + pad * 2;
+    canvas.height = bitmap.height + pad * 2;
+    const ctx = canvas.getContext('2d');
+    // Canvas is transparent by default (no fill) — the padding stays clear.
+    ctx.drawImage(bitmap, pad, pad);
+    bitmap.close && bitmap.close();
+    return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('padding step produced empty image')), 'image/png'));
+  }
+  // Plain <a download> + blob URL is inert when this file is running as a
+  // published claude.ai Artifact (the host intercepts it and shows "File
+  // downloads aren't available"). When the `downloads` capability is
+  // present, use it; otherwise fall back to the classic anchor trick, which
+  // is what actually saves the file when this page runs standalone (opened
+  // directly, emailed, hosted on a merchant's own server, etc).
+  let downloadsCapability = null, downloadsChecked = false;
+  async function getDownloadsCapability(){
+    if (downloadsChecked) return downloadsCapability;
+    downloadsChecked = true;
+    try {
+      if (window.claude && typeof window.claude.use === 'function') {
+        downloadsCapability = await window.claude.use('downloads');
+      }
+    } catch (e) { downloadsCapability = null; }
+    return downloadsCapability;
+  }
+  function downloadViaAnchor(blob, file){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = file; a.style.display = 'none';
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+  async function download(blob, file){
+    const downloads = await getDownloadsCapability();
+    if (downloads) {
+      const result = await downloads.save({ filename: file, data: blob });
+      return result && result.status === 'saved' ? 'Saved' : 'Sent';
+    }
+    downloadViaAnchor(blob, file);
+    return 'Saved';
   }
   async function exportShot(){
     if (st.busy) return;
@@ -7940,13 +7995,19 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
       let blob;
       try { blob = await viaModern(target); }
       catch (first) { console.warn('modern-screenshot failed, trying html2canvas:', first); blob = await viaHtml2canvas(target); }
-      download(blob, p.file);
+      blob = await addPadding(blob, st.frame ? EXPORT_PAD_CSS_FRAMED : EXPORT_PAD_CSS);
+      const verb = await download(blob, p.file);
       commit(p);
       ui.reset.hidden = false;
-      setStatus('Saved ' + p.num + ' ' + p.label);
+      setStatus(verb + ' ' + p.num + ' ' + p.label);
     } catch (e) {
       console.error('Screenshot export failed:', e);
-      setStatus('Could not capture this screen (' + ((e && e.message) || 'unknown error') + ')', true);
+      const code = e && e.code;
+      const msg = code === 'declined' ? 'Download was declined'
+        : code === 'too_large' ? 'File is too large to save here'
+        : code ? ('Could not save this screen (' + code + ')')
+        : 'Could not capture this screen (' + ((e && e.message) || 'unknown error') + ')';
+      setStatus(msg, true);
     } finally {
       if (vp) Array.prototype.forEach.call(vp.children, c => c.removeAttribute('data-shot-i'));
       st.busy = false; ui.export.disabled = false;
