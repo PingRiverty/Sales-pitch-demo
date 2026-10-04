@@ -7,7 +7,7 @@
 <link id="favicon" rel="icon" type="image/svg+xml" href="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Demo version: see VERSION_HISTORY in the script (current V0.33) -->
+<!-- Demo version: see VERSION_HISTORY in the script (current V0.35) -->
 <!-- Riverty pages: GT Ultra Median and SF Pro Text, embedded as subset WOFF2 in the stylesheet below. Never merchant-driven. -->
 <!-- Merchant fonts: href replaced at runtime from merchantConfig.fonts.href -->
 <link id="merchantFonts" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -98,6 +98,12 @@
     overflow:hidden; flex-shrink:0;
   }
   .logo-mark img{width:100%; height:100%; object-fit:cover; display:block;}
+  /* An uploaded logo that is clearly wider than tall (a wordmark) keeps its
+     shape instead of being cropped to the square tile. Square logos keep the tile. */
+  .logo-mark.is-wide{width:auto !important; max-width:150px; background:transparent; border-radius:0;}
+  .logo-mark.is-wide img{width:auto; max-width:100%; object-fit:contain;}
+  body.force-mobile .logo-mark.is-wide{max-width:110px;}
+  @media (max-width:640px){ .logo-mark.is-wide{max-width:110px;} }
   .store-name{font-size:19px;}
   .logo-wordmark{display:none; align-items:center; height:28px;}
   .logo-wordmark img{height:100%; width:auto; max-width:180px; object-fit:contain; display:block;}
@@ -1655,6 +1661,16 @@
     justify-content:space-between; align-items:center; gap:8px; pointer-events:none;}
   .demo-dock > *{pointer-events:auto;}
   .demo-dock-controls{display:flex; gap:8px; align-items:center; margin-left:auto;}
+  /* Merchant link (lock=1): nothing to configure, no API trace. Desktop/Mobile stays. */
+  html.demo-locked #openConfig, html.demo-locked .topbar-sep, html.demo-locked #configDrawer,
+  html.demo-locked #traceToggle, html.demo-locked #tracePanel{display:none !important;}
+  .cfg-link{padding:18px 0 4px; border-top:1px solid var(--line); margin-top:18px;}
+  .cfg-link .field-label{display:block; margin-bottom:4px;}
+  .cfg-link .field-hint{margin:0 0 12px;}
+  .cfg-link-out textarea{width:100%; margin-top:10px; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+    padding:8px 10px; border:1px solid var(--line); border-radius:6px; resize:vertical; color:var(--ink); background:#fff; word-break:break-all;}
+  .cfg-link-row{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; font-size:12px; color:var(--ink-soft);}
+  .cfg-link-row a{color:var(--ink); text-decoration:underline;}
   .device-chip{
     display:flex; gap:2px; padding:3px; border-radius:999px; background:#1E1E1C; opacity:0.82;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -2926,6 +2942,15 @@
         </div>
       </div>
     </details>
+    <section class="cfg-link" aria-labelledby="cfgLinkTitle">
+      <span class="field-label" id="cfgLinkTitle">Merchant link</span>
+      <p class="field-hint">A locked link that opens this exact setup, logo included. The merchant can walk the journey and switch Desktop/Mobile, but can't open Customize or the API trace. No need to apply first.</p>
+      <button type="button" class="btn btn-outline btn-block" id="copyMerchantLinkBtn">Copy merchant link</button>
+      <div class="cfg-link-out" id="merchantLinkOut" hidden>
+        <textarea id="merchantLinkText" rows="3" readonly aria-label="Merchant link"></textarea>
+        <div class="cfg-link-row"><span id="merchantLinkStatus" role="status"></span><a id="merchantLinkOpen" href="#" target="_blank" rel="noopener">Open in a new tab</a></div>
+      </div>
+    </section>
   </div>
   <div class="drawer-foot cfg-foot">
     <button class="btn btn-primary" id="applyConfigBtn">Apply changes</button>
@@ -3453,6 +3478,67 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
 <script type="application/json" id="merchantConfig">null</script>
 
 <script>
+  // ---------- Usage analytics (V0.34) ----------
+  // Internal-use only: tracks which payment methods, journeys and styles get
+  // used in this demo, not customer data. No PII is sent — see track() below
+  // for the full list of properties on each event.
+  //
+  // Fill in POSTHOG_KEY to turn this on. Left empty, track() is a silent no-op
+  // (safe to host with analytics off, e.g. while the key is pending).
+  const POSTHOG_KEY = '';                     // Project API key (starts with 'phc_')
+  const POSTHOG_HOST = 'https://eu.i.posthog.com'; // 'https://us.i.posthog.com' for a US-region project
+  if (POSTHOG_KEY) {
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.uploadQueue=t.uploadQueue||[],t.uploadQueue.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init bs ws ge fs capture je Di ks register register_once register_for_session unregister unregister_for_session Is getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Ds Fs createPersonProfile Ps Es opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init(POSTHOG_KEY, { api_host: POSTHOG_HOST, person_profiles: 'identified_only', capture_pageview: false });
+  }
+  function trackEvent(event, props){
+    try { if (window.posthog && POSTHOG_KEY) posthog.capture(event, props || {}); } catch (e) { /* analytics never blocks the demo */ }
+  }
+
+  // ---------- Page link: plain settings or a merchant link (V0.35) ----------
+  // Settings arrive three ways and are merged in this order:
+  //   ?style=bold&market=de...  the readable link Customize > Apply makes
+  //   #logo=...                 the uploaded logo after Apply (kept after # so
+  //                             the server never sees a long URL)
+  //   #j=<token>                a merchant link: all settings, the logo and
+  //                             lock=1, scrambled (base64url of the query) so
+  //                             the link isn't obviously editable. Not
+  //                             encryption: it hides the settings, it can't
+  //                             stop a determined person from changing them.
+  // Everything that reads settings calls pageParams(), never location.search.
+  function b64urlEncode(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlDecode(text){
+    let b = text.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    const bin = atob(b);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  const PAGE_PARAMS = (function readPageParams(){
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash.replace(/^#/, '');
+    try {
+      const extra = hash.startsWith('j=') ? new URLSearchParams(b64urlDecode(hash.slice(2))) : new URLSearchParams(hash);
+      extra.forEach((v, k) => params.set(k, v));
+    } catch (e) {
+      console.error('This merchant link could not be read, so the default demo opens instead.', e);
+    }
+    return params;
+  })();
+  function pageParams(){ return new URLSearchParams(PAGE_PARAMS); }
+  // Locked: the merchant walks the journey and can switch Desktop/Mobile, but
+  // Customize and the API trace are gone. The disclaimer stays, as on every view.
+  const DEMO_LOCKED = PAGE_PARAMS.get('lock') === '1';
+  if (DEMO_LOCKED) document.documentElement.classList.add('demo-locked');
+  // Only a small image data URL may come in from a link (it ends up in an <img src>).
+  const LINK_LOGO_PATTERN = /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/;
+
   // ---------- Merchant config ----------
   const MERCHANT = (function readMerchantConfig(){
     try {
@@ -4499,7 +4585,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     applyPalette();
   }
   function sfInit(){
-    const params = new URLSearchParams(window.location.search);
+    const params = pageParams();
     if (params.get('style') && SF.presets[params.get('style')]) sfStyle = params.get('style');
     sfSlotParam = params.get('sl') || '';
     if (params.get('co') && SF.variants.checkout[params.get('co')]) sfCheckout = params.get('co');
@@ -4507,7 +4593,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   }
   function sfInitPalette(){
     if (MERCHANT || sfStyle === 'classic') return;
-    const params = new URLSearchParams(window.location.search);
+    const params = pageParams();
     if (Object.values(PALETTE_PARAMS).some(k => params.has(k))) return; // the link carries colors
     sfLoadPalette();
   }
@@ -5301,6 +5387,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     const m = PAYMENT_METHODS.find(x => x.id === method);
     if (m && m.installments) renderPaylaterBreakdown();
     updatePlaceOrderButtonLabel();
+    trackEvent('payment_method_selected', { method, market: currentMarket, style: sfStyle, grey_label: whiteLabelRiverty });
   }
 
   function updatePlaceOrderButtonLabel(){
@@ -5502,8 +5589,10 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
         }
         setFieldError(dobFieldId, null);
       }
+      trackEvent('checkout_started', { method: m.id, group: 'riverty', market: currentMarket, style: sfStyle, grey_label: whiteLabelRiverty });
       startRivertyFlow(m, collectedDob);
     } else {
+      trackEvent('checkout_started', { method: m ? m.id : null, group: m ? m.group : null, market: currentMarket, style: sfStyle, grey_label: whiteLabelRiverty });
       finalizeOrder(m);
     }
   });
@@ -6835,6 +6924,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     if (order.status === 'Accepted') {
       finalizeOrder(m, session.orderNumber);
     } else {
+      trackEvent('order_declined', { method: session.methodId, market: currentMarket, style: sfStyle, reason: order.customerFacingMessage || order.status });
       const notice = document.getElementById('rivertyReturnNotice');
       document.getElementById('rivertyReturnNoticeText').textContent = order.customerFacingMessage || 'Your payment was not completed. Choose a payment method to try again.';
       notice.style.display = 'flex';
@@ -6862,6 +6952,10 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
       method: m ? m.label : 'N/A',
       installments: m && m.installments,
     };
+    trackEvent('order_completed', {
+      method: m ? m.id : null, group: m ? m.group : null, market: currentMarket, style: sfStyle,
+      grey_label: whiteLabelRiverty, installments: !!(m && m.installments), total,
+    });
     const confirmLines = document.getElementById('confirmLines');
     confirmLines.innerHTML = lastOrder.lines.map(l =>
       `<div class="confirm-line"><span>${l.name}${l.variant ? `, ${l.variant}` : ''} × ${l.qty}</span><span>${money(l.price * l.qty)}</span></div>`
@@ -6891,17 +6985,45 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   }
 
   // ---------- Configurator: logo + colors (in-memory, per-session only) ----------
+  // The logo travels in links (Apply and merchant links) as a small WebP copy:
+  // at most 360 x 120 px, plenty for a header mark at 2x, a few KB in the link.
+  let logoLinkData = '';
+  function setLogo(dataUrl){
+    logoUploaded = true;
+    document.body.classList.remove('has-wordmark');
+    const mark = document.getElementById('logoMark');
+    mark.innerHTML = `<img src="${dataUrl}" alt="Merchant logo">`;
+    document.getElementById('uploadPreview').innerHTML = `<img src="${dataUrl}" alt="Merchant logo">`;
+    const img = mark.querySelector('img');
+    const fit = () => mark.classList.toggle('is-wide', img.naturalWidth > img.naturalHeight * 1.25);
+    if (img.complete) fit(); else img.addEventListener('load', fit, { once: true });
+  }
+  function shrinkLogo(dataUrl){
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const w0 = img.naturalWidth || 360, h0 = img.naturalHeight || 120;
+        const k = Math.min(1, 360 / w0, 120 / h0);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        let out = c.toDataURL('image/webp', 0.85);
+        if (!out.startsWith('data:image/webp')) out = c.toDataURL('image/png'); // browsers without WebP encoding
+        resolve(out);
+      };
+      img.onerror = () => resolve('');
+      img.src = dataUrl;
+    });
+  }
   const logoInput = document.getElementById('logoInput');
   logoInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const dataUrl = ev.target.result;
-      logoUploaded = true;
-      document.body.classList.remove('has-wordmark');
-      document.getElementById('logoMark').innerHTML = `<img src="${dataUrl}" alt="Merchant logo">`;
-      document.getElementById('uploadPreview').innerHTML = `<img src="${dataUrl}" alt="Merchant logo">`;
+      setLogo(dataUrl);
+      logoLinkData = await shrinkLogo(dataUrl);
     };
     reader.readAsDataURL(file);
   });
@@ -6910,9 +7032,8 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   // a real page reload, rather than patched live into the DOM. This is
   // deliberate: it demos closer to how a real "save theme" action on a
   // merchant platform behaves, and the config becomes bookmarkable/shareable
-  // as a URL. The one thing that does NOT survive: an uploaded logo image —
-  // it's applied live but too large to round-trip through a URL, so it
-  // falls back to the initials mark after a reload.
+  // as a URL. The uploaded logo rides along as a small WebP copy after the #
+  // (see setLogo/shrinkLogo), so the server never sees it.
   function buildConfigQuery(){
     const params = new URLSearchParams();
     params.set('v', currentVertical);
@@ -6946,7 +7067,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   }
 
   function loadConfigFromURL(){
-    const params = new URLSearchParams(window.location.search);
+    const params = pageParams();
     if (![...params.keys()].length) return;
     if (!MERCHANT && params.has('v') && VERTICALS.some(x => x.id === params.get('v'))) {
       currentVertical = params.get('v');
@@ -7042,12 +7163,36 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     applyPalette();
   });
 
+  function pageBaseUrl(){ return window.location.href.split(/[?#]/)[0]; }
   document.getElementById('applyConfigBtn').addEventListener('click', () => {
-    window.location.search = buildConfigQuery();
+    trackEvent('customize_applied', { style: sfStyle, market: currentMarket, checkout: sfCheckout, grey_label: whiteLabelRiverty });
+    const logoPart = logoLinkData ? '#' + new URLSearchParams({ logo: logoLinkData }).toString() : '';
+    window.location.href = pageBaseUrl() + '?' + buildConfigQuery() + logoPart;
   });
   document.getElementById('resetBrand').addEventListener('click', () => {
-    if (window.location.search) window.location.search = '';
+    if (window.location.search || window.location.hash) window.location.href = pageBaseUrl();
     else window.location.reload();
+  });
+  // Merchant link: the live settings (applied or not), the logo and lock=1,
+  // scrambled into #j=. Copied when the browser allows it (an embed may not),
+  // and always shown selected in the box so it can be copied by hand.
+  function buildMerchantLink(){
+    const params = new URLSearchParams(buildConfigQuery());
+    params.set('lock', '1');
+    if (logoLinkData) params.set('logo', logoLinkData);
+    return pageBaseUrl() + '#j=' + b64urlEncode(params.toString());
+  }
+  document.getElementById('copyMerchantLinkBtn').addEventListener('click', async () => {
+    const link = buildMerchantLink();
+    const box = document.getElementById('merchantLinkText');
+    const status = document.getElementById('merchantLinkStatus');
+    document.getElementById('merchantLinkOut').hidden = false;
+    box.value = link;
+    document.getElementById('merchantLinkOpen').href = link;
+    box.focus(); box.select();
+    let copied = false;
+    try { await navigator.clipboard.writeText(link); copied = true; } catch (e) { /* not allowed here; the box is selected instead */ }
+    status.textContent = copied ? 'Copied. Paste it in an email or Frontify.' : 'Selected. Press Ctrl+C (Cmd+C) to copy.';
   });
 
   // ---------- Version history ----------
@@ -7055,6 +7200,24 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   // bump the version by 0.01, set the UTC timestamp, the person who made the
   // change and a short list of what changed. The Customize panel shows it.
   const VERSION_HISTORY = [
+    {
+      version: '0.35',
+      date: '2026-10-04T10:00:00Z',
+      author: '',
+      changes: [
+        'Merchant links: Customize > Merchant link copies a locked link that opens the current setup (style, colours, store name, logo, market, payment methods, journey and unhappy-path settings). The settings are scrambled into the part after # so the link is not obviously editable; it hides them, it is not encryption.',
+        'Locked links hide Customize and the API trace. The merchant can still switch Desktop/Mobile, and the disclaimer stays on every view.',
+        'An uploaded logo now survives Apply and travels in merchant links, as a small WebP copy (at most 360 x 120 px). Wide logos (wordmarks) keep their shape in the header instead of being cropped to the square tile; square logos look as before.',
+      ]
+    },
+    {
+      version: '0.34',
+      date: '2026-10-03T18:00:00Z',
+      author: '',
+      changes: [
+        'Optional usage analytics (PostHog), off by default: set POSTHOG_KEY near the top of the script to turn it on. Tracks which payment methods, journeys and styles get used (payment_method_selected, checkout_started, order_completed, order_declined, customize_applied, demo_viewed) \u2014 no customer PII. With the key left empty, every call is a silent no-op; confirmed inert and zero console errors in that state.',
+      ]
+    },
     {
       version: '0.33',
       date: '2026-10-03T12:00:00Z',
@@ -7330,6 +7493,14 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   renderFooterShopColumn();
   renderCartBadge();
   initHeroBlobRepel();
+  (function applyLinkLogo(){
+    const logo = PAGE_PARAMS.get('logo');
+    if (logo && LINK_LOGO_PATTERN.test(logo)) { setLogo(logo); logoLinkData = logo; }
+  })();
+  trackEvent('demo_viewed', {
+    style: sfStyle, market: currentMarket, checkout: sfCheckout, grey_label: whiteLabelRiverty,
+    merchant_mode: !!MERCHANT, merchant_name: MERCHANT ? (MERCHANT.name || null) : null,
+  });
 </script>
 
 <script>
@@ -7381,7 +7552,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
 
     var startView = 'desktop';
     try {
-      var q = new URLSearchParams(window.location.search);
+      var q = pageParams();
       if (q.get('view') === 'mobile') startView = 'mobile';
       if (q.get('fill') === '1') fillMode = true;
     } catch (e) {}
