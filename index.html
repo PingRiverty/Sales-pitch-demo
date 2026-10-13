@@ -7,7 +7,7 @@
 <link id="favicon" rel="icon" type="image/svg+xml" href="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Demo version: see VERSION_HISTORY in the script (current V0.41) -->
+<!-- Demo version: see VERSION_HISTORY in the script (current V0.42) -->
 <!-- Riverty pages: GT Ultra Median and SF Pro Text, embedded as subset WOFF2 in the stylesheet below. Never merchant-driven. -->
 <!-- Merchant fonts: href replaced at runtime from merchantConfig.fonts.href -->
 <link id="merchantFonts" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -5292,7 +5292,8 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
         : (brandedRiverty
             ? `<img src="${RIVERTY_LOGO}" alt="Riverty">`
             : (isRiverty ? WHITE_LABEL_ICON : m.icon));
-      const subtitleHtml = m.subtitle ? `<div class="pm-row-subtitle">${m.subtitle}</div>` : '';
+      const subtitle = methodSubtitle(m);
+      const subtitleHtml = subtitle ? `<div class="pm-row-subtitle">${subtitle}</div>` : '';
       const attributionHtml = (whiteLabelRiverty && WHITE_LABEL_ATTRIBUTION_IDS.includes(m.id))
         ? whiteLabelAttributionHTML(m) : '';
       const expandHtml = paymentExpandBody(m);
@@ -5301,7 +5302,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
           <button type="button" class="pm-row" data-method="${m.id}" onclick="selectPaymentMethod('${m.id}')">
             <div class="${logoBoxClass}">${logoContent}</div>
             <div class="pm-row-text">
-              <div class="pm-row-title">${m.label}</div>
+              <div class="pm-row-title">${methodLabel(m)}</div>
               ${subtitleHtml}
               ${attributionHtml}
             </div>
@@ -5396,6 +5397,14 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     }
     return `<div class="wl-attribution"><img src="${RIVERTY_ATTRIBUTION}" alt="Payments with Riverty"></div>`;
   }
+  // Grey-label 14-day invoice in Germany has its own name and tagline, on the
+  // merchant checkout and on the Riverty page alike. Branded DE and other
+  // markets keep "14-day Invoice" / "Buy now, pay in 14 days".
+  const DE_GREY_INVOICE14_LABEL = 'Pay in 14 days';
+  const DE_GREY_INVOICE14_TAGLINE = 'Pay after receiving your order';
+  function isDeGreyInvoice14(id){ return id === 'invoice14' && currentMarket === 'DE' && whiteLabelRiverty; }
+  function methodLabel(m){ return isDeGreyInvoice14(m.id) ? DE_GREY_INVOICE14_LABEL : m.label; }
+  function methodSubtitle(m){ return isDeGreyInvoice14(m.id) ? DE_GREY_INVOICE14_TAGLINE : m.subtitle; }
   let whiteLabelRiverty = false;
   function setWhiteLabel(on){
     whiteLabelRiverty = !!on;
@@ -6012,7 +6021,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     document.querySelectorAll('[data-rhc-merchant-line]').forEach(el => { el.textContent = `${storeName} (${money(t.total)})`; });
     document.querySelectorAll('[data-rhc-lines]').forEach(el => { el.innerHTML = rivertyOrderLinesHTML(); });
     document.getElementById('rhcMethodTitle').textContent = copy.title;
-    document.getElementById('rhcMethodTagline').textContent = copy.tagline;
+    document.getElementById('rhcMethodTagline').textContent = isDeGreyInvoice14(m.id) ? DE_GREY_INVOICE14_TAGLINE : copy.tagline;
     // Shoppers who will sign a credit agreement are told upfront. Instalments
     // has its own plan and agreement screens, so no toast there (as in Figma 68:15044).
     document.getElementById('rhcCreditToast').hidden = !rivertyCreditAgreement || m.id === 'instalments' || m.id === 'directdebit';
@@ -6987,7 +6996,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
       id: orderNumber || ('ORD-' + Math.floor(100000 + Math.random() * 900000)),
       lines: cart.map(c => ({ ...findProduct(c.id), variant: c.variant, qty: c.qty })),
       subtotal, discount, deliveryFee, total,
-      method: m ? m.label : 'N/A',
+      method: m ? methodLabel(m) : 'N/A',
       installments: m && m.installments,
     };
     trackEvent('order_completed', {
@@ -7238,6 +7247,15 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
   // bump the version by 0.01, set the UTC timestamp, the person who made the
   // change and a short list of what changed. The Customize panel shows it.
   const VERSION_HISTORY = [
+    {
+      version: '0.42',
+      date: '2026-10-13T12:00:00Z',
+      author: '',
+      changes: [
+        'Germany, grey label: 14-day invoice is now called "Pay in 14 days" (checkout and order confirmation) with the tagline "Pay after receiving your order", both on the merchant checkout and on the Riverty page (Pay in 14 days card). Branded Germany and other markets keep "14-day Invoice" / "Buy now, pay in 14 days". The Customize method list keeps the internal name.',
+        'Export screenshot: the phone is captured at its true size, not at the zoomed size it is shown at. Measuring at the zoomed size made text boxes a hair too narrow in the PNG, so headings such as "Confirm payment" wrapped onto two lines and thin seams showed at the edges.',
+      ]
+    },
     {
       version: '0.41',
       date: '2026-10-04T23:00:00Z',
@@ -7989,6 +8007,15 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
     st.busy = true; ui.export.disabled = true; setStatus('Capturing…');
     const vp = document.getElementById('viewport');
     if (vp) Array.prototype.forEach.call(vp.children, (c, i) => c.setAttribute('data-shot-i', i));
+    // The capture copies every element's computed size from the live page. While
+    // the phone is shown zoomed (Fit to window), those sizes are measured at the
+    // zoomed font size and don't scale back exactly: text boxes come out a hair
+    // too narrow at zoom 1, so headings like "Confirm payment" wrap, and
+    // fractional edges leave thin seams. Measure at true size instead: drop the
+    // zoom to 1 for the length of the capture and put it back afterwards.
+    const frameEl = document.getElementById('deviceFrame');
+    const prevScale = frameEl ? frameEl.style.getPropertyValue('--device-scale') : '';
+    if (frameEl && prevScale) frameEl.style.setProperty('--device-scale', '1');
     try {
       const p = plan();
       const target = document.getElementById(st.frame ? 'deviceFrame' : 'deviceScreen');
@@ -8009,6 +8036,7 @@ SF.variant('footer', 'bold', { label: 'Bold footer: ink newsletter band, calm co
         : 'Could not capture this screen (' + ((e && e.message) || 'unknown error') + ')';
       setStatus(msg, true);
     } finally {
+      if (frameEl && prevScale) frameEl.style.setProperty('--device-scale', prevScale);
       if (vp) Array.prototype.forEach.call(vp.children, c => c.removeAttribute('data-shot-i'));
       st.busy = false; ui.export.disabled = false;
     }
